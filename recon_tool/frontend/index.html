@@ -37,10 +37,46 @@
   .modal-box .field b { display: inline-block; width: 110px; color: #555; }
   .modal-box .comment-box { margin-top: 10px; padding: 12px; background: #f5f6f8; border-radius: 6px; font-size: 13px; line-height: 1.5; }
   .modal-box .close-btn { margin-top: 16px; float: right; padding: 6px 14px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; }
+
+  @keyframes cardPopIn {
+    0% { opacity: 0; transform: translateY(14px) scale(0.96); }
+    60% { opacity: 1; transform: translateY(-2px) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .card.pop-in { animation: cardPopIn 0.5s ease-out both; }
+  .card.pop-in:nth-child(1) { animation-delay: 0s; }
+  .card.pop-in:nth-child(2) { animation-delay: 0.1s; }
+  .card.pop-in:nth-child(3) { animation-delay: 0.2s; }
+
+  @keyframes toastIn {
+    0% { opacity: 0; transform: translate(-50%, -16px); }
+    100% { opacity: 1; transform: translate(-50%, 0); }
+  }
+  @keyframes checkDraw {
+    0% { stroke-dashoffset: 24; }
+    100% { stroke-dashoffset: 0; }
+  }
+  #successToast {
+    position: fixed; top: 18px; left: 50%; z-index: 1100;
+    display: flex; align-items: center; gap: 10px;
+    background: #1d7a46; color: white; padding: 12px 20px; border-radius: 30px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2); font-size: 14px; font-weight: 500;
+    animation: toastIn 0.4s ease-out both;
+    opacity: 0; pointer-events: none;
+  }
+  #successToast.show { opacity: 1; pointer-events: auto; }
+  #successToast svg { width: 20px; height: 20px; flex-shrink: 0; }
+  #successToast circle { fill: none; stroke: white; stroke-width: 2; opacity: 0.5; }
+  #successToast path { fill: none; stroke: white; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 24; stroke-dashoffset: 24; animation: checkDraw 0.5s ease-out 0.25s forwards; }
 </style>
 </head>
 <body>
 <header><h1>Intercompany Reconciliation Assistant</h1></header>
+<div id="successToast">
+  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M7 12.5l3 3 7-7"/></svg>
+  <span id="successToastText"></span>
+</div>
 <main>
   <div>
     <input type="file" id="fileInput" accept=".xlsx,.xls">
@@ -192,6 +228,24 @@ document.querySelectorAll(".filter-bar button").forEach(b => {
   b.addEventListener("click", () => applyQuickFilter(b.dataset.filter));
 });
 
+function showSuccessToast(text) {
+  const toast = document.getElementById("successToast");
+  document.getElementById("successToastText").textContent = text;
+  toast.classList.remove("show");
+  void toast.offsetWidth; // restart CSS animation on repeat triggers
+  toast.classList.add("show");
+  clearTimeout(showSuccessToast._t);
+  showSuccessToast._t = setTimeout(() => toast.classList.remove("show"), 2800);
+}
+
+function animateCardsIn() {
+  document.querySelectorAll(".cards .card").forEach(c => {
+    c.classList.remove("pop-in");
+    void c.offsetWidth;
+    c.classList.add("pop-in");
+  });
+}
+
 async function runReconciliation() {
   const sheetId = document.getElementById("sheetSelect").value;
   currentSheetId = sheetId;
@@ -208,10 +262,13 @@ async function runReconciliation() {
   document.getElementById("openRows").textContent = data.open_rows;
   document.getElementById("cards").style.display = "flex";
   document.getElementById("filterBar").style.display = "flex";
+  animateCardsIn();
 
   applyQuickFilter("all");
   const rows = data.rows.map(r => ({ ...r, group_id: r.group_id || OPEN_GROUP }));
   await loadRows(rows);
+
+  showSuccessToast(`Reconciliation complete — ${data.matched_rows.toLocaleString()} items auto-matched (${data.matched_pct}%), ${data.open_rows.toLocaleString()} need review.`);
 }
 
 document.getElementById("runBtn").addEventListener("click", runReconciliation);
