@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reconciliation Assistant</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/tabulator/6.3.0/css/tabulator.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tabulator/6.3.0/js/tabulator.min.js"></script>
+<style>
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; background: #f5f6f8; color: #1a1a2e; }
+  header { background: #142850; color: white; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 20px; }
+  main { padding: 20px 24px; max-width: 1300px; margin: 0 auto; }
+  select, button { font-size: 14px; padding: 6px 10px; margin-right: 8px; }
+  .cards { display: flex; gap: 16px; margin: 20px 0; }
+  .card { background: white; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1; }
+  .card .num { font-size: 28px; font-weight: 700; }
+  .card .label { font-size: 12px; color: #666; text-transform: uppercase; }
+  .cat-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; color: white; white-space: nowrap; }
+  .cat-matched { background: #27ae60; }
+  .cat-aged { background: #c0392b; }
+  .cat-await { background: #e67e22; }
+  .cat-timing { background: #2980b9; }
+  #loading { color: #888; font-style: italic; }
+  .filter-bar { margin: 14px 0 6px; display: flex; gap: 6px; align-items: center; }
+  .filter-bar button { background: #eef0f3; border: 1px solid #ddd; border-radius: 14px; cursor: pointer; }
+  .filter-bar button.active { background: #142850; color: white; border-color: #142850; }
+  #grid { margin-top: 8px; }
+  .tabulator-row.row-matched { background: #eafaf0 !important; }
+  .tabulator { font-size: 13px; }
+  .tabulator-cell[tabulator-field="draft_comment"] { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+  #downloadBtn { background: #1d7a46; color: white; border: none; border-radius: 4px; padding: 6px 14px; cursor: pointer; }
+  #downloadBtn:hover { background: #166238; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+  .modal-box { background: white; border-radius: 8px; max-width: 560px; width: 90%; padding: 20px 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
+  .modal-box h3 { margin: 0 0 12px; font-size: 16px; }
+  .modal-box .field { margin-bottom: 8px; font-size: 13px; }
+  .modal-box .field b { display: inline-block; width: 110px; color: #555; }
+  .modal-box .comment-box { margin-top: 10px; padding: 12px; background: #f5f6f8; border-radius: 6px; font-size: 13px; line-height: 1.5; }
+  .modal-box .close-btn { margin-top: 16px; float: right; padding: 6px 14px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; }
+</style>
+</head>
+<body>
+<header><h1>Intercompany Reconciliation Assistant</h1></header>
+<main>
+  <div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <button id="uploadBtn">Upload file</button>
+    <span id="uploadStatus" style="font-size:13px;color:#666;margin-left:8px">Upload a reconciliation file to begin.</span>
+  </div>
+  <div style="margin-top:10px">
+    <select id="sheetSelect" disabled><option value="">No sheets loaded yet</option></select>
+    <button id="runBtn" disabled>Run reconciliation</button>
+  </div>
+  <div id="loading"></div>
+  <div class="cards" id="cards" style="display:none">
+    <div class="card"><div class="num" id="totalRows">-</div><div class="label">Total lines</div></div>
+    <div class="card"><div class="num" id="matchedPct">-</div><div class="label">Auto-matched (net to zero)</div></div>
+    <div class="card"><div class="num" id="openRows">-</div><div class="label">Open items to review</div></div>
+  </div>
+  <div class="filter-bar" id="filterBar" style="display:none">
+    <span style="font-size:12px;color:#666;margin-right:4px">Show:</span>
+    <button data-filter="all" class="active">All</button>
+    <button data-filter="matched">Matched</button>
+    <button data-filter="Aged">Aged</button>
+    <button data-filter="Awaiting">Awaiting counterparty</button>
+    <button data-filter="Timing">Timing difference</button>
+    <span style="flex:1"></span>
+    <button id="downloadBtn">⬇ Download Excel</button>
+  </div>
+  <div id="grid"></div>
+</main>
+<div id="modalBackdrop" class="modal-backdrop" style="display:none">
+  <div class="modal-box">
+    <h3>Item detail</h3>
+    <div id="modalBody"></div>
+    <button class="close-btn" id="modalCloseBtn">Close</button>
+  </div>
+</div>
+<script>
+const API = "";
+const OPEN_GROUP = "__open__";
+let table = null;
+let activeFilter = "all";
+let currentSheetId = null;
+
+function showItemModal(row) {
+  const statusLabel = row.status === "matched" ? "✅ Matched (auto-resolved)" : "🔎 Open - needs review";
+  document.getElementById("modalBody").innerHTML = `
+    <div class="field"><b>Status</b> ${statusLabel}</div>
+    <div class="field"><b>Account</b> ${row.account ?? ""}</div>
+    <div class="field"><b>Amount</b> ${row.amount != null ? row.amount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : ""}</div>
+    <div class="field"><b>Posting date</b> ${row.posting_date ?? ""}${row.age_days != null ? ` (${row.age_days} days old)` : ""}</div>
+    <div class="field"><b>Reference</b> ${row.reference ?? ""}</div>
+    <div class="field"><b>Category</b> ${row.category ?? ""}</div>
+    <div class="comment-box">${row.draft_comment ?? ""}</div>
+  `;
+  document.getElementById("modalBackdrop").style.display = "flex";
+}
+
+function closeModal() { document.getElementById("modalBackdrop").style.display = "none"; }
+document.getElementById("modalCloseBtn").addEventListener("click", closeModal);
+document.getElementById("modalBackdrop").addEventListener("click", (e) => {
+  if (e.target.id === "modalBackdrop") closeModal();
+});
+
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  if (!currentSheetId) return;
+  window.location.href = API + `/api/export/${currentSheetId}`;
+});
+
+async function loadSheets() {
+  const res = await fetch(API + "/api/sheets");
+  const sheets = await res.json();
+  const sel = document.getElementById("sheetSelect");
+  const runBtn = document.getElementById("runBtn");
+  if (!sheets.length) {
+    sel.innerHTML = `<option value="">No sheets loaded yet</option>`;
+    sel.disabled = true;
+    runBtn.disabled = true;
+    return;
+  }
+  sel.innerHTML = sheets.map(s => `<option value="${s.sheet_id}">${s.working_group} / ${s.erp}</option>`).join("");
+  sel.disabled = false;
+  runBtn.disabled = false;
+}
+
+function catClass(cat) {
+  if (cat.startsWith("Matched")) return "cat-matched";
+  if (cat.startsWith("Aged")) return "cat-aged";
+  if (cat.startsWith("Awaiting")) return "cat-await";
+  return "cat-timing";
+}
+
+function buildTable(initialRows) {
+  if (table) return table;
+  table = new Tabulator("#grid", {
+    layout: "fitColumns",
+    height: "560px",
+    data: initialRows,
+    groupBy: "group_id",
+    groupHeader: (value, count, data) => {
+      if (value === OPEN_GROUP) return `Open items (${count})`;
+      const net = data.reduce((s, r) => s + (r.amount || 0), 0);
+      return `Matched group ${value} — ${count} lines, nets to ${net.toFixed(2)}`;
+    },
+    columns: [
+      { title: "Status", field: "status", width: 90, headerFilter: "list",
+        headerFilterParams: { values: { "": "All", "matched": "Matched", "open": "Open" } },
+        formatter: (cell) => cell.getValue() === "matched" ? "✅ Matched" : "🔎 Open" },
+      { title: "Account", field: "account", width: 110, headerFilter: "input" },
+      { title: "Amount", field: "amount", width: 120, headerFilter: "input",
+        formatter: (cell) => { const v = cell.getValue(); return v == null ? "" : v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); } },
+      { title: "Date", field: "posting_date", width: 100, headerFilter: "input" },
+      { title: "Age", field: "age_days", width: 80, headerFilter: "input",
+        formatter: (cell) => { const v = cell.getValue(); return v == null ? "" : v + "d"; } },
+      { title: "Reference", field: "reference", minWidth: 140, headerFilter: "input" },
+      { title: "Category", field: "category", minWidth: 170, headerFilter: "input",
+        formatter: (cell) => `<span class="cat-badge ${catClass(cell.getValue())}">${cell.getValue()}</span>` },
+      { title: "Draft comment", field: "draft_comment", minWidth: 320, headerFilter: "input" },
+    ],
+    rowFormatter: (row) => {
+      const el = row.getElement();
+      if (row.getData().status === "matched") el.classList.add("row-matched");
+    },
+  });
+  table.on("cellClick", (e, cell) => {
+    if (cell.getColumn().getField() === "draft_comment") showItemModal(cell.getRow().getData());
+  });
+  return table;
+}
+
+async function loadRows(rows) {
+  if (!table) {
+    buildTable(rows);
+    await new Promise((resolve) => table.on("tableBuilt", resolve));
+  } else {
+    await table.setData(rows);
+  }
+}
+
+function applyQuickFilter(kind) {
+  activeFilter = kind;
+  document.querySelectorAll(".filter-bar button").forEach(b => b.classList.toggle("active", b.dataset.filter === kind));
+  if (!table) return;
+  table.clearFilter();
+  if (kind === "all") return;
+  if (kind === "matched") { table.setFilter("status", "=", "matched"); return; }
+  table.setFilter("category", "like", kind);
+}
+
+document.querySelectorAll(".filter-bar button").forEach(b => {
+  b.addEventListener("click", () => applyQuickFilter(b.dataset.filter));
+});
+
+async function runReconciliation() {
+  const sheetId = document.getElementById("sheetSelect").value;
+  currentSheetId = sheetId;
+  document.getElementById("loading").textContent = "Running...";
+  document.getElementById("cards").style.display = "none";
+  document.getElementById("filterBar").style.display = "none";
+
+  const res = await fetch(API + `/api/reconcile/${sheetId}`);
+  const data = await res.json();
+  document.getElementById("loading").textContent = "";
+
+  document.getElementById("totalRows").textContent = data.total_rows;
+  document.getElementById("matchedPct").textContent = data.matched_pct + "%";
+  document.getElementById("openRows").textContent = data.open_rows;
+  document.getElementById("cards").style.display = "flex";
+  document.getElementById("filterBar").style.display = "flex";
+
+  applyQuickFilter("all");
+  const rows = data.rows.map(r => ({ ...r, group_id: r.group_id || OPEN_GROUP }));
+  await loadRows(rows);
+}
+
+document.getElementById("runBtn").addEventListener("click", runReconciliation);
+
+document.getElementById("uploadBtn").addEventListener("click", async () => {
+  const input = document.getElementById("fileInput");
+  const status = document.getElementById("uploadStatus");
+  if (!input.files.length) { status.textContent = "Choose a file first."; return; }
+
+  const form = new FormData();
+  form.append("file", input.files[0]);
+  status.textContent = "Uploading...";
+  try {
+    const res = await fetch(API + "/api/upload", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Upload failed");
+    status.textContent = `Loaded ${data.length} sheet(s).`;
+    await loadSheets();
+    const sel = document.getElementById("sheetSelect");
+    sel.value = data[0].sheet_id;
+    runReconciliation();
+  } catch (e) {
+    status.textContent = "Error: " + e.message;
+  }
+});
+
+loadSheets();
+</script>
+</body>
+</html>

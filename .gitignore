@@ -1,0 +1,17 @@
+# Hackathon input data - provided data, not source code
+/Hackathon_*.xlsx
+/Finance_Hackathon_Kick_off_Slides_2026_11_05.pdf
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
