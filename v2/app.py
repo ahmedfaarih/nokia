@@ -113,7 +113,7 @@ h1, h2, h3 {{color:{NAVY}; letter-spacing:-.015em}}
 </style>""", unsafe_allow_html=True)
 
 ss = st.session_state
-for k, v in {"res": None, "upload_key": 0, "view": None, "todo_key": 0, "ai_text": {},
+for k, v in {"res": None, "upload_key": 0, "view": None, "todo_key": 0, "ai_text": {}, "analysing": False,
              "ai_provider": next((p for p, e in [("groq", "GROQ_API_KEY"), ("gemini", "GEMINI_API_KEY"),
                                                  ("claude", "ANTHROPIC_API_KEY")] if os.environ.get(e)), "groq"),
              "ai_keys": {"claude": os.environ.get("ANTHROPIC_API_KEY", ""),
@@ -248,8 +248,8 @@ if ss.res is None:
         st.markdown("<div class='h'>Upload SAP extracts</div><div class='hint'>Excel files, one sheet per ERP. "
                     "Several working groups can be uploaded together.</div>", unsafe_allow_html=True)
         files = st.file_uploader("SAP open-item extracts (.xlsx)", type="xlsx", accept_multiple_files=True,
-                                 key=f"up_{ss.upload_key}", label_visibility="collapsed")
-        go = st.button("Analyse files", type="primary", disabled=not files, width="stretch")
+                                 key=f"up_{ss.upload_key}", label_visibility="collapsed", disabled=ss.analysing)
+        go = st.button("Analyse files", type="primary", disabled=not files or ss.analysing, width="stretch")
     with right, st.container(border=True):
         st.markdown("<div class='h'>How it works</div>", unsafe_allow_html=True)
         steps = [("Upload", "SAP extracts for any working group."),
@@ -259,6 +259,13 @@ if ss.res is None:
                             "</div></div>" for i, (t, d) in enumerate(steps)), unsafe_allow_html=True)
     with left:
         if go:
+            # Flip the flag and rerun immediately so the button/uploader render
+            # disabled *before* the (slow) analysis starts - otherwise a user
+            # who clicks again while it's running can queue up repeat runs.
+            ss.analysing = True
+            st.rerun()
+
+        if ss.analysing:
             with st.status("Analysing files ...", expanded=True) as status:
                 tmp = Path(tempfile.mkdtemp())
                 paths = []
@@ -270,12 +277,14 @@ if ss.res is None:
                 try:
                     res = run(paths, use_llm=False)
                 except Exception as e:
+                    ss.analysing = False
                     status.update(label="Could not analyse these files", state="error")
                     st.error(str(e))
                     st.stop()
                 buf = io.BytesIO()
                 write_excel(res, buf)
                 ss.res, ss.files, ss.excel = res, [u.name for u in files], buf.getvalue()
+                ss.analysing = False
                 status.update(label="Done", state="complete")
             st.rerun()
     st.markdown(FOOT, unsafe_allow_html=True)
