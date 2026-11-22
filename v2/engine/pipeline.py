@@ -108,15 +108,15 @@ def write_excel(res: dict, path):
     items = res["items"]
     kpi = kpis(items)
     with pd.ExcelWriter(path, engine="openpyxl") as xw:
-        pd.DataFrame(list(kpi.items()), columns=["KPI", "Value"]).to_excel(xw, "KPIs", index=False)
-        res["action_plan"].to_excel(xw, "Action plan", index=False)
-        res["accounts"].to_excel(xw, "Account summary", index=False)
+        pd.DataFrame(list(kpi.items()), columns=["KPI", "Value"]).to_excel(xw, sheet_name="KPIs", index=False)
+        res["action_plan"].to_excel(xw, sheet_name="Action plan", index=False)
+        res["accounts"].to_excel(xw, sheet_name="Account summary", index=False)
         top = items.sort_values("risk_score", ascending=False)
-        top[[c for c in ITEM_EXPORT_COLS if c in top]].to_excel(xw, "All items (scored)", index=False)
+        top[[c for c in ITEM_EXPORT_COLS if c in top]].to_excel(xw, sheet_name="All items (scored)", index=False)
         if not res["partners"].empty:
-            res["partners"].to_excel(xw, "IC partner check", index=False)
+            res["partners"].to_excel(xw, sheet_name="IC partner check", index=False)
         if not res["roll_forward"].empty:
-            res["roll_forward"].to_excel(xw, "FA roll-forward", index=False)
+            res["roll_forward"].to_excel(xw, sheet_name="FA roll-forward", index=False)
         for ws in xw.book.worksheets:
             ws.freeze_panes = "A2"
             for col in ws.columns:
