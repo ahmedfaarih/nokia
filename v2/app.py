@@ -15,7 +15,12 @@ from engine.pipeline import kpis, run, write_excel
 
 st.set_page_config(page_title="ReconRadar", layout="wide", initial_sidebar_state="collapsed")
 
-BLUE, GREEN, RED, AMBER, GREY = "#124191", "#2E8B57", "#C8102E", "#D98E04", "#6B7280"
+# Palette inspired by Nokia's 2023 identity and the Nokia Pure design language:
+# white space, a deep "classic" blue, a bright blue accent, and vivid secondary hues for data.
+NAVY, BLUE, PURPLE = "#001135", "#005AFF", "#6E3CFF"
+GREEN, RED, AMBER, GREY = "#00A884", "#E8304F", "#F5A400", "#5B6478"
+LINE, SOFT = "#E3E8F1", "#F3F5F9"
+GRAD = f"linear-gradient(110deg, {NAVY} 0%, #0B2E8C 42%, {BLUE} 78%, {PURPLE} 112%)"
 PLAIN = {
     "Overdue vs allowed ageing": "Open longer than allowed",
     "Uncleared offsetting items": "Matching items not cleared",
@@ -31,41 +36,80 @@ PRIO_COL = {"High": RED, "Medium": AMBER, "Low": GREEN}
 
 st.markdown(f"""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+html, body, .stApp, .stMarkdown, p, li, label, input, textarea, button, h1, h2, h3, h4 {{
+  font-family: "Nokia Pure Text", "Nokia Pure Headline", "Inter", "Segoe UI", system-ui, sans-serif;
+}}
 #MainMenu, footer, header[data-testid="stHeader"], [data-testid="stDecoration"] {{display:none}}
-.block-container {{padding-top:2rem; padding-bottom:3rem; max-width:1380px}}
-[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) {{background:white;border-radius:12px}}
-.brand {{display:flex;align-items:center;gap:12px}}
-.mark {{width:38px;height:38px;border-radius:10px;background:{BLUE};position:relative;flex:none}}
-.mark:before {{content:"";position:absolute;inset:9px;border:2.5px solid white;border-radius:50%}}
-.mark:after {{content:"";position:absolute;width:7px;height:7px;background:white;border-radius:50%;left:15.5px;top:15.5px}}
-.brand .name {{font-size:1.55rem;font-weight:700;color:#111827;letter-spacing:-.01em}}
+.stApp {{background:{SOFT}}}
+.block-container {{padding-top:1.6rem; padding-bottom:3rem; max-width:1360px}}
+h1, h2, h3 {{color:{NAVY}; letter-spacing:-.015em}}
+/* cards: generous radius, hairline borders, no shadows */
+[data-testid="stVerticalBlockBorderWrapper"]:has(> div > [data-testid="stVerticalBlock"]) {{
+  background:white; border-radius:16px !important; border:1px solid {LINE} !important; padding:6px 6px}}
+/* pill buttons */
+.stButton button, .stDownloadButton button, [data-testid="stPopover"] button {{
+  border-radius:999px !important; font-weight:600; border:1px solid {LINE}}}
+.stButton button[kind="primary"] {{background:{BLUE}; border-color:{BLUE}}}
+.stButton button[kind="primary"]:hover {{background:#0047CC; border-color:#0047CC}}
+.stButton button[kind="primary"]:disabled {{background:#C9D6F2; border-color:#C9D6F2; color:white; opacity:1}}
+[data-testid="stButtonGroup"] button {{border-radius:999px !important}}
+[data-baseweb="select"] > div, [data-testid="stFileUploaderDropzone"], textarea, input {{border-radius:12px !important}}
+[data-testid="stFileUploaderDropzone"] {{background:{SOFT}; border:1.5px dashed #B9C6DD}}
+[data-testid="stDataFrame"] {{border-radius:12px; overflow:hidden}}
+/* brand */
+.brand {{display:flex;align-items:center;gap:10px}}
+.mark {{width:34px;height:34px;border-radius:10px;background:{GRAD};position:relative;flex:none}}
+.mark:before {{content:"";position:absolute;inset:8px;border:2px solid white;border-radius:50%}}
+.mark:after {{content:"";position:absolute;width:6px;height:6px;background:white;border-radius:50%;left:14px;top:14px}}
+.brand .name {{font-size:1.25rem;font-weight:700;color:{NAVY};letter-spacing:-.02em}}
+.brand .tag {{font-size:.72rem;font-weight:600;color:{BLUE};background:#E6EEFF;padding:3px 9px;border-radius:999px;margin-left:4px}}
+/* hero band */
+.hero {{background:{GRAD};border-radius:16px;padding:30px 34px;color:white;margin:6px 0 22px;position:relative;overflow:hidden}}
+.hero:after {{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;
+  border:36px solid rgba(255,255,255,.07)}}
+.hero .eyebrow {{font-size:.75rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.75}}
+.hero .headline {{font-size:1.9rem;font-weight:700;line-height:1.2;margin:6px 0 8px;letter-spacing:-.02em;max-width:900px}}
+.hero .meta {{font-size:.9rem;opacity:.85}}
+.hero .pill {{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);
+  padding:4px 12px;border-radius:999px;font-size:.8rem;margin:12px 8px 0 0}}
 .sub {{color:{GREY};font-size:.88rem}}
-.kpi {{background:white;border:1px solid #E5E7EB;border-radius:12px;padding:18px 20px;margin-bottom:22px}}
-.kpi .t {{color:{GREY};font-size:.82rem;font-weight:500;text-transform:uppercase;letter-spacing:.04em}}
-.kpi .v {{font-size:2rem;font-weight:700;line-height:1.25;margin:4px 0 2px}}
+/* KPI cards */
+.kpi {{background:white;border:1px solid {LINE};border-radius:16px;padding:20px 22px;margin-bottom:22px;height:100%}}
+.kpi .t {{display:flex;align-items:center;gap:8px;color:{GREY};font-size:.8rem;font-weight:600}}
+.kpi .t i {{width:8px;height:8px;border-radius:50%;display:inline-block}}
+.kpi .v {{font-size:2.2rem;font-weight:700;line-height:1.2;margin:8px 0 2px;color:{NAVY};letter-spacing:-.02em}}
 .kpi .s {{color:{GREY};font-size:.82rem}}
-.h {{font-size:1.05rem;font-weight:650;color:#111827;margin:0 0 2px}}
+.kpi.hi {{background:{GRAD};border:none}}
+.kpi.hi .t, .kpi.hi .s {{color:rgba(255,255,255,.82)}}
+.kpi.hi .v {{color:white}}
+.h {{font-size:1.02rem;font-weight:650;color:{NAVY};margin:4px 0 2px}}
 .hint {{color:{GREY};font-size:.84rem;margin-bottom:14px}}
-.bar-row {{display:grid;grid-template-columns:210px 1fr 56px;align-items:center;gap:12px;margin:10px 0}}
-.bar-row .lbl {{font-size:.88rem;color:#374151;text-align:right}}
-.bar-track {{background:#F1F3F6;border-radius:6px;height:22px;overflow:hidden}}
-.bar-fill {{height:100%;border-radius:6px}}
-.bar-row .num {{font-size:.88rem;font-weight:600;color:#111827}}
-.stack-row {{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:12px;margin:12px 0}}
-.stack {{display:flex;height:26px;border-radius:6px;overflow:hidden}}
-.stack div {{display:flex;align-items:center;justify-content:center;color:white;font-size:.78rem;font-weight:600}}
-.legend {{display:flex;gap:18px;margin-top:14px;font-size:.82rem;color:{GREY}}}
-.legend i {{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}}
-.chip {{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:600;margin-right:6px}}
-.facts div {{display:flex;justify-content:space-between;border-bottom:1px solid #F1F3F6;padding:7px 0;font-size:.88rem}}
+/* bars */
+.bar-row {{display:grid;grid-template-columns:220px 1fr 60px;align-items:center;gap:14px;margin:12px 0}}
+.bar-row .lbl {{font-size:.88rem;color:{NAVY};text-align:right}}
+.bar-track {{background:#EEF2F8;border-radius:999px;height:14px;overflow:hidden}}
+.bar-fill {{height:100%;border-radius:999px}}
+.bar-row .num {{font-size:.9rem;font-weight:700;color:{NAVY}}}
+.stack-row {{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:14px;margin:14px 0}}
+.stack {{display:flex;height:28px;border-radius:999px;overflow:hidden;gap:2px;background:white}}
+.stack div {{display:flex;align-items:center;justify-content:center;color:white;font-size:.76rem;font-weight:700}}
+.legend {{display:flex;gap:18px;margin-top:16px;font-size:.82rem;color:{GREY}}}
+.legend i {{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}}
+.chip {{display:inline-block;padding:4px 12px;border-radius:999px;font-size:.78rem;font-weight:600;margin-right:6px}}
+.facts div {{display:flex;justify-content:space-between;border-bottom:1px solid #EEF2F8;padding:8px 0;font-size:.88rem;color:{NAVY}}}
 .facts div span:first-child {{color:{GREY}}}
 .facts div span:last-child {{text-align:right;max-width:65%}}
-.step {{display:flex;gap:14px;align-items:flex-start;background:white;border:1px solid #E5E7EB;border-radius:12px;padding:18px;height:100%}}
-.step .n {{flex:none;width:28px;height:28px;border-radius:50%;background:#E8EEF8;color:{BLUE};font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.9rem}}
-.step b {{display:block;font-size:.95rem;color:#111827;margin-bottom:3px}}
-.step span {{color:{GREY};font-size:.85rem;line-height:1.45}}
-.reason {{background:#FBF3F3;border-left:3px solid {RED};padding:8px 12px;border-radius:6px;margin:6px 0;font-size:.88rem}}
-.ai-tag {{display:inline-block;background:#EEF2FB;color:{BLUE};font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.04em}}
+/* start screen */
+.step {{display:flex;gap:14px;align-items:flex-start;padding:14px 4px;border-bottom:1px solid #EEF2F8}}
+.step:last-child {{border-bottom:none}}
+.step .n {{flex:none;width:30px;height:30px;border-radius:50%;background:{GRAD};color:white;font-weight:700;
+  display:flex;align-items:center;justify-content:center;font-size:.85rem}}
+.step b {{display:block;font-size:.95rem;color:{NAVY};margin-bottom:2px}}
+.step span {{color:{GREY};font-size:.86rem;line-height:1.45}}
+.reason {{background:#FFF1F3;border-left:3px solid {RED};padding:9px 12px;border-radius:10px;margin:6px 0;font-size:.88rem;color:{NAVY}}}
+.ai-tag {{display:inline-block;background:#E6EEFF;color:{BLUE};font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:999px;letter-spacing:.05em}}
+.foot {{color:#8A93A6;font-size:.75rem;text-align:center;margin-top:28px}}
 </style>""", unsafe_allow_html=True)
 
 ss = st.session_state
@@ -89,14 +133,25 @@ def reset():
     ss.upload_key += 1
 
 
-def brand(size="normal"):
-    return "<div class='brand'><div class='mark'></div><div class='name'>ReconRadar</div></div>"
+def brand(tag=""):
+    t = f"<span class='tag'>{tag}</span>" if tag else ""
+    return f"<div class='brand'><div class='mark'></div><div class='name'>ReconRadar</div>{t}</div>"
 
 
-def kpi(col, title, value, sub, color):
-    col.markdown(f"<div class='kpi' style='border-top:3px solid {color}'><div class='t'>{title}</div>"
-                 f"<div class='v' style='color:{color}'>{value}</div><div class='s'>{sub}</div></div>",
-                 unsafe_allow_html=True)
+def hero(eyebrow, headline, meta, pills=()):
+    p = "".join(f"<span class='pill'>{html.escape(x)}</span>" for x in pills)
+    st.markdown(f"<div class='hero'><div class='eyebrow'>{eyebrow}</div><div class='headline'>{headline}</div>"
+                f"<div class='meta'>{meta}</div>{p}</div>", unsafe_allow_html=True)
+
+
+FOOT = ("<div class='foot'>Visual design inspired by the Nokia Pure principles: radically simple, human, dynamic. "
+        "Not an official Nokia product.</div>")
+
+
+def kpi(col, title, value, sub, color, highlight=False):
+    col.markdown(f"<div class='kpi{' hi' if highlight else ''}'><div class='t'><i style='background:"
+                 f"{'white' if highlight else color}'></i>{title}</div>"
+                 f"<div class='v'>{value}</div><div class='s'>{sub}</div></div>", unsafe_allow_html=True)
 
 
 def esc(x):
@@ -182,26 +237,27 @@ def ai_settings():
 
 # =========================================================== EMPTY STATE ===
 if ss.res is None:
-    _, mid, _ = st.columns([1, 2.2, 1])
-    with mid:
-        st.write("")
-        st.markdown(brand(), unsafe_allow_html=True)
-        st.markdown("<h1 style='font-size:2.1rem;line-height:1.25;margin:22px 0 8px'>Find what needs fixing "
-                    "in your balance sheet reconciliation - before month-end close.</h1>"
-                    f"<div class='sub' style='font-size:1rem;margin-bottom:22px'>Upload the SAP open-item "
-                    "extracts for Payroll, Intercompany or Fixed Assets. ReconRadar checks every line and "
-                    "gives you a prioritised to-do list.</div>", unsafe_allow_html=True)
+    st.markdown(brand("Balance sheet reconciliation"), unsafe_allow_html=True)
+    hero("Continuous reconciliation",
+         "Find what needs fixing in your balance sheet, before month-end close.",
+         "Upload the SAP open-item extracts. ReconRadar checks every line, explains the normal items "
+         "and gives you a prioritised to-do list.",
+         ("Payroll", "Intercompany", "Fixed Assets", "P20 · BPP · P10"))
+    left, right = st.columns([1.35, 1], gap="large")
+    with left, st.container(border=True):
+        st.markdown("<div class='h'>Upload SAP extracts</div><div class='hint'>Excel files, one sheet per ERP. "
+                    "Several working groups can be uploaded together.</div>", unsafe_allow_html=True)
         files = st.file_uploader("SAP open-item extracts (.xlsx)", type="xlsx", accept_multiple_files=True,
-                                 key=f"up_{ss.upload_key}")
+                                 key=f"up_{ss.upload_key}", label_visibility="collapsed")
         go = st.button("Analyse files", type="primary", disabled=not files, width="stretch")
-        st.write("")
-        s = st.columns(3)
-        steps = [("Upload", "SAP extracts for any working group - one sheet per ERP."),
+    with right, st.container(border=True):
+        st.markdown("<div class='h'>How it works</div>", unsafe_allow_html=True)
+        steps = [("Upload", "SAP extracts for any working group."),
                  ("Automatic checks", "Matching, ageing, duplicates, partner balances and unusual postings."),
-                 ("To-do list", "Who fixes what and by when, with SAP document numbers and AI comments.")]
-        for i, (t, d) in enumerate(steps):
-            s[i].markdown(f"<div class='step'><div class='n'>{i + 1}</div><div><b>{t}</b><span>{d}</span>"
-                          "</div></div>", unsafe_allow_html=True)
+                 ("To-do list", "Who fixes what and by when, with SAP document numbers and AI-drafted comments.")]
+        st.markdown("".join(f"<div class='step'><div class='n'>{i + 1}</div><div><b>{t}</b><span>{d}</span>"
+                            "</div></div>" for i, (t, d) in enumerate(steps)), unsafe_allow_html=True)
+    with left:
         if go:
             with st.status("Analysing files ...", expanded=True) as status:
                 tmp = Path(tempfile.mkdtemp())
@@ -222,6 +278,7 @@ if ss.res is None:
                 ss.res, ss.files, ss.excel = res, [u.name for u in files], buf.getvalue()
                 status.update(label="Done", state="complete")
             st.rerun()
+    st.markdown(FOOT, unsafe_allow_html=True)
     st.stop()
 
 # ============================================================ HEADER ===
@@ -233,8 +290,7 @@ plan["Account"] = plan["account"].astype(str) + " " + plan["account_desc"].filln
 
 hl, hr = st.columns([2.4, 1.6], vertical_alignment="center")
 rd = pd.to_datetime(items["recon_date"]).max()
-hl.markdown(brand() + f"<div class='sub' style='margin-top:6px'>{len(ss.files)} file(s) · "
-            f"{esc(', '.join(ss.files))} · reconciliation date {rd:%d %b %Y}</div>", unsafe_allow_html=True)
+hl.markdown(brand("Balance sheet reconciliation"), unsafe_allow_html=True)
 with hr:
     a, b, c = st.columns([1.15, 1.2, 0.8])
     with a:
@@ -369,6 +425,12 @@ if ss.view is not None:
     st.stop()
 
 # ============================================================ DASHBOARD ===
+kk = kpis(items)
+hero(f"Reconciliation date {rd:%d %B %Y}",
+     f"{kk['Items explained automatically (%)']:.0f}% of {kk['Open items']:,} open items explained automatically",
+     f"{kk['Required Adjustment Items']:,} need fixing in SAP and {kk['Items needing human review']:,} need a human look. "
+     f"Start with the High priority rows in the to-do list.",
+     [f.replace('Hackathon_', '').replace('_Nokia', '').replace('.xlsx', '').replace('_', ' ') for f in ss.files])
 areas = ["All"] + sorted(items["work_group"].unique())
 f1, f2, _ = st.columns([2.2, 1.4, 2])
 # remember filters while the user is in a drill-in view
@@ -390,7 +452,7 @@ k = kpis(f)
 c = st.columns(4, gap="medium")
 kpi(c[0], "Open items checked", f"{k['Open items']:,}", "every line in the uploaded files", BLUE)
 kpi(c[1], "Explained automatically", f"{k['Items explained automatically (%)']:.0f}%",
-    f"{k['Items explained automatically']:,} items - no action needed", GREEN)
+    f"{k['Items explained automatically']:,} items - no action needed", GREEN, highlight=True)
 kpi(c[2], "Need fixing in SAP", f"{k['Required Adjustment Items']:,}", "errors to correct", RED)
 kpi(c[3], "Need a human look", f"{k['Items needing human review']:,}", "could not be explained automatically", AMBER)
 
@@ -407,7 +469,7 @@ with l, st.container(border=True):
         mx = cnt.max()
         rows = "".join(
             f"<div class='bar-row'><div class='lbl'>{esc(name)}</div><div class='bar-track'><div class='bar-fill' "
-            f"style='width:{max(n / mx * 100, 1.2):.1f}%;background:{AMBER if name == 'Needs a human explanation' else RED}'>"
+            f"style='width:{max(n / mx * 100, 1.2):.1f}%;background:{AMBER if name == 'Needs a human explanation' else f'linear-gradient(90deg, {BLUE}, {PURPLE})'}'>"
             f"</div></div><div class='num'>{n:,}</div></div>" for name, n in cnt.items())
         st.markdown(rows, unsafe_allow_html=True)
 with r, st.container(border=True):
@@ -420,7 +482,7 @@ with r, st.container(border=True):
     for wg_, row in tab.iterrows():
         segs = "".join(f"<div style='width:{row.get(n, 0):.2f}%;background:{col}'>"
                        f"{f'{row.get(n, 0):.0f}%' if row.get(n, 0) >= 7 else ''}</div>" for n, col in cols)
-        rows += f"<div class='stack-row'><div class='lbl' style='font-size:.88rem;color:#374151'>{esc(wg_)}</div><div class='stack'>{segs}</div></div>"
+        rows += f"<div class='stack-row'><div class='lbl' style='font-size:.88rem;color:{NAVY}'>{esc(wg_)}</div><div class='stack'>{segs}</div></div>"
     legend = "".join(f"<span><i style='background:{col}'></i>{n}</span>" for n, col in cols)
     st.markdown(rows + f"<div class='legend'>{legend}</div>", unsafe_allow_html=True)
 
@@ -445,3 +507,4 @@ with st.container(border=True):
             ss.view = p.iloc[sel[0]].to_dict()
             ss.todo_key += 1          # clear the selection so "Back" returns to a clean list
             st.rerun()
+st.markdown(FOOT, unsafe_allow_html=True)
