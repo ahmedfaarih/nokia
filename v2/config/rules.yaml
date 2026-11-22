@@ -1,0 +1,73 @@
+# Shared settings for every working group.
+# Rule packs (config/rulepacks/*.yaml) switch detectors on/off and add their own
+# categories, ageing rules and owners on top of these defaults.
+
+# ---------------------------------------------------------------------------
+# Flags: weight in the risk score, the issue type it rolls up to, and whether it
+# makes an item a Required Adjustment Item (RAI).
+# ---------------------------------------------------------------------------
+flags:
+  offset_uncleared:     {weight: 18, issue: "Uncleared offsetting items",  rai: true,  label: "nets to zero with other open items (same key) but was never cleared"}
+  reversed_still_open:  {weight: 18, issue: "Uncleared offsetting items",  rai: true,  label: "document and its reversal are both still open"}
+  offset_amount_only:   {weight: 8,  issue: "Possible match (amount only)", rai: false, label: "an open item with the exact opposite amount exists (no shared key)"}
+  overdue:              {weight: 20, issue: "Overdue vs allowed ageing",   rai: true,  label: "older than allowed ageing"}
+  stale_temporary:      {weight: 16, issue: "Stale temporary item",        rai: true,  label: "temporary item (accrual / transit) older than it should be"}
+  duplicate:            {weight: 16, issue: "Possible duplicate",          rai: true,  label: "same entity, account, amount, date and text as another item"}
+  missing_partner:      {weight: 12, issue: "Missing trading partner",     rai: true,  label: "intercompany item without a trading partner"}
+  ic_difference:        {weight: 20, issue: "IC partner mismatch",         rai: true,  label: "partner entity shows a different balance"}
+  sign_anomaly:         {weight: 10, issue: "Unusual sign / posting key",  rai: false, label: "debit/credit direction unusual for this account"}
+  monthly_spike:        {weight: 8,  issue: "Unusual amount / spike",      rai: false, label: "part of a month far above the account's normal level"}
+  ml_anomaly:           {weight: 10, issue: "Unusual amount / spike",      rai: false, label: "statistically unusual vs. similar items (ML)"}
+  round_amount:         {weight: 4,  issue: "Manual / unusual posting",    rai: false, label: "large round amount"}
+  manual_posting:       {weight: 4,  issue: "Manual / unusual posting",    rai: false, label: "manual posting by a person (not a robot/interface)"}
+  backdated:            {weight: 4,  issue: "Manual / unusual posting",    rai: false, label: "entered long after its posting date"}
+  weekend:              {weight: 2,  issue: "Manual / unusual posting",    rai: false, label: "posted on a weekend"}
+  text_investigation:   {weight: 15, issue: "Flagged in text as problem",  rai: true,  label: "text says it is wrong / needs investigation"}
+  text_poor:            {weight: 5,  issue: "Poor / missing description",  rai: false, label: "text is blank or not meaningful"}
+  zero_amount:          {weight: 3,  issue: "Zero-value line",             rai: false, label: "zero amount in local currency (clean-up candidate)"}
+
+# Risk score = materiality (0-35) + age (0-20) + flags (0-45, capped)
+risk:
+  materiality_max: 35
+  age_max: 20
+  flags_cap: 45
+  high_threshold: 60
+  medium_threshold: 35
+
+# Words that mean the poster themselves thinks something is wrong
+problem_text_pattern: "investigat|wrong|error|mistake|incorrect|to be checked|tbc|unknown|unclear|check"
+
+# ---------------------------------------------------------------------------
+# Shared movement / content categories (regex, case-insensitive, first match wins).
+# Rule packs put their own, more specific patterns in front of these.
+# ---------------------------------------------------------------------------
+categories:
+  - [FX revaluation,        "valuation|reval|sapf100|fx "]
+  - [Reversal,              "revers|reversl|storno"]
+  - [Correction / adjustment, "correction|\\badj|adjust|reclass|wrong|rectif"]
+  - [Withholding tax,       "\\bwht|withholding"]
+  - [Recharge / service fee, "recharge|operating fee|lump sum|service|royalt|licen"]
+  - [Goods in transit,      "\\bgit\\b|transit"]
+  - [Accrual,               "accru|\\baccr|\\bacc\\b|provision"]
+  - [Interest,              "interest|zins"]
+  - [Invoice-based item,    "^\\s*\\d{8,}"]
+
+# Items whose category tells us they should not stay open for long
+temporary_categories: [Accrual, Goods in transit, Asset accrual, Reversal, Correction / adjustment, FX revaluation]
+
+# Generic action owners per issue type (rule packs can override)
+owners:
+  "Uncleared offsetting items":  {team: "GL Accounting (preparer)",        action: "Clear the matching items in SAP (manual clearing F-03 / F-44) and attach clearing doc."}
+  "Possible match (amount only)": {team: "GL Accounting (preparer)",       action: "Check if the opposite-amount item is the true offset; clear or document why not."}
+  "Overdue vs allowed ageing":   {team: "Entity controller",               action: "Explain the overdue balance and agree a resolution date; correct or settle in SAP."}
+  "Stale temporary item":        {team: "GL Accounting (preparer)",        action: "Reverse or reclassify the old temporary posting; it should not still be open."}
+  "Possible duplicate":          {team: "GL Accounting (preparer)",        action: "Confirm with poster; reverse the duplicate posting if confirmed."}
+  "Missing trading partner":     {team: "Intercompany team",               action: "Add the trading partner (reclass) so the item can be eliminated."}
+  "IC partner mismatch":         {team: "Intercompany team + partner entity", action: "Agree balance with the partner entity; book missing side or correct difference."}
+  "Unusual sign / posting key":  {team: "GL Accounting (preparer)",        action: "Check posting key / sign; correct if posted the wrong way round."}
+  "Unusual amount / spike":      {team: "Entity controller",               action: "Validate the amount against source (payroll report / invoice)."}
+  "Manual / unusual posting":    {team: "Reviewer",                        action: "Review support for the manual entry (SOX: manual JE evidence)."}
+  "Flagged in text as problem":  {team: "GL Accounting (preparer)",        action: "Investigate as noted by the poster; correct in SAP and update comment."}
+  "Poor / missing description":  {team: "GL Accounting (preparer)",        action: "Replace with the suggested standard comment."}
+  "Zero-value line":             {team: "GL Accounting (preparer)",        action: "Clean up zero-value line (clear/archive)."}
+  "No issue":                    {team: "-",                               action: "No action - explained automatically."}

@@ -1,0 +1,45 @@
+name: Fixed Assets
+match: [fixed asset, fixed_asset]
+
+# Non-OIM account: items are never cleared, so pairs that net to zero are
+# treated as EXPLAINED (no balance impact) instead of as an issue.
+detectors:
+  offsetting_pairs: {enabled: true, keys: [reference, assignment], amount_only: false, treat_as: explained}
+  reversal_pairs:   {enabled: true, treat_as: explained}
+  overdue:          {enabled: false}
+  stale_temporary:  {enabled: true, max_days: 365}
+  partner:          {enabled: false}
+  duplicates:       {enabled: true}
+  sign_anomaly:     {enabled: true}
+  monthly_spike:    {enabled: false}
+  ml_anomaly:       {enabled: true, contamination: 0.02}
+  round_amount:     {enabled: true, min_eur: 10000}
+  manual_posting:   {enabled: true}
+  backdated:        {enabled: true, days: 30}
+  weekend:          {enabled: true}
+  text_quality:     {enabled: true}
+  zero_amount:      {enabled: true}
+  roll_forward:     {enabled: true}
+
+categories:
+  - [Goods in transit,        "\\bgit\\b|transit"]
+  - [Asset transfer accrual,  "\\biat\\b|transfer"]
+  - [Asset accrual,           "asset accru|assets accru|asset invoice"]
+  - [IC asset accrual,        "ic accru|winshuttle|sql|ic ap acc"]
+  - [Correction / adjustment, "ap adj|adjust|correction|reclass"]
+  - [Disposal / retirement,   "retire|dispos|scrap|sale of asset"]
+  - [Acquisition,             "acquisit|capitali|^\\s*\\d{8,}"]
+
+list_categories:   [Acquisition]
+timing_categories: [Asset accrual, IC asset accrual, Asset transfer accrual, Goods in transit, Accrual]
+temporary_categories: [Asset accrual, IC asset accrual, Asset transfer accrual, Goods in transit, Accrual, Correction / adjustment]
+
+# Roll-forward movement buckets (by category)
+roll_forward_buckets:
+  Additions:   [Acquisition, Asset accrual, IC asset accrual, Accrual, Invoice-based item]
+  Transfers:   [Asset transfer accrual, Goods in transit]
+  Retirements: [Disposal / retirement]
+  Corrections: [Correction / adjustment, Reversal]
+
+owners:
+  "Stale temporary item": {team: "Asset accounting", action: "Old asset accrual / transit: capitalise to the asset register or reverse the accrual."}

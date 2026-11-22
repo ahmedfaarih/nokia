@@ -1,0 +1,51 @@
+# Canonical data model.
+# Every ERP sheet (P20, BPP, P10, ...) is renamed to these standard columns.
+# For each standard field, list every source column name it may appear as.
+# The first alias found in a sheet wins. To support a new ERP or file,
+# just add its column names here - no code change needed.
+
+fields:
+  cocd:            [CoCd]
+  account:         [Account]
+  account_desc:    [Description]
+  doc_no:          [DocumentNo]
+  item:            [Item, ItemNo in Doc]
+  doc_type:        [Type, DocumentType]
+  year:            [Year]
+  period:          [Period]
+  amount_dc:       [Amount in DC, Ammount in DC]
+  curr_dc:         [Curr.]
+  amount_lc:       [Amount in Local Currency, Amount in LC]
+  curr_lc:         [Lcurr, LCurr]
+  amount_eur:      [Amount in EUR]
+  posting_date:    [Pstng Date]
+  doc_date:        [Doc. Date, Doc Date]
+  entry_date:      [Entry Date]
+  user:            [User Name]
+  text:            [Text]
+  header_text:     [Doc.Header Text]
+  profit_center:   [Profit Ctr]
+  assignment:      [Assignment]
+  reference:       [Reference]
+  wbs:             [WBS elem., WBS Elem.]
+  partner:         [Tr.Prt, Reprt. Customer, Supplier]
+  posting_key:     [PK]
+  dc_indicator:    [Debit Credit Indicator]
+  reversal:        [Reversal]
+  clearing_doc:    [Clrng doc., Clrng Doc.]
+  vendor_name:     [Vendor name]
+  customer_name:   [Customer Name]
+  account_mgmt:    [OIM/Non-OIM/Subledger, GL Account Categories]
+  allowed_ageing:  [Ageing Allowed (Days)]
+  age_days:        [Ageing(No of days), Current Ageing (Days)]
+  age_bucket:      [Ageing category/Range, Current Ageing (Range)]
+  due_status:      [Due/Not Due, Due/Not Due Aged/Not Aged]
+  clearable_flag:  [Clearable Item]
+  net_due_date:    [Net due dt]
+  counterparty_type: [Vendor/Customer Type, Internal/External]
+
+# Values that carry no information when used as a matching key
+empty_key_values: ["", "0", "0.0", "00000", "000000", "00000000", "nan", "none", "text"]
+
+# Automated users (anything else is treated as a manual posting)
+bot_user_prefixes: [BOT_]

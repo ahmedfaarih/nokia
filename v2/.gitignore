@@ -1,0 +1,8 @@
+data/
+output/
+*.xlsx
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.streamlit/secrets.toml

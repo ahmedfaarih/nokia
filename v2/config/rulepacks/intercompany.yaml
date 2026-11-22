@@ -1,0 +1,32 @@
+name: Intercompany
+match: [intercompany, " ic "]
+
+detectors:
+  offsetting_pairs: {enabled: true, keys: [assignment, reference], amount_only: true, treat_as: issue}
+  reversal_pairs:   {enabled: true, treat_as: issue}
+  overdue:          {enabled: true, use_allowed_ageing_column: false, default_allowed_days: 365}
+  stale_temporary:  {enabled: false}
+  partner:          {enabled: true, partner_entity_pattern: "^N?(C\\d{3})$", tolerance_eur: 100}
+  duplicates:       {enabled: true}
+  sign_anomaly:     {enabled: true}
+  monthly_spike:    {enabled: false}
+  ml_anomaly:       {enabled: true, contamination: 0.02}
+  round_amount:     {enabled: true, min_eur: 10000}
+  manual_posting:   {enabled: true}
+  backdated:        {enabled: true, days: 30}
+  weekend:          {enabled: true}
+  text_quality:     {enabled: true}
+  zero_amount:      {enabled: true}
+
+categories:
+  - [Withholding tax,        "\\bwht|withholding"]
+  - [FX revaluation,         "valuation|reval|sapf100"]
+  - [Recharge / service fee, "recharge|operating fee|lump sum|service|royalt|licen|\\bgnb\\b|\\bihs\\b"]
+  - [IC accrual,             "accru|winshuttle|\\bacc\\b"]
+  - [Correction / adjustment, "correction|\\badj|adjust|audit adj|reclass"]
+
+list_categories:   []
+timing_categories: [Withholding tax, Recharge / service fee, IC accrual, Invoice-based item, FX revaluation, Accrual, Goods in transit]
+
+owners:
+  "Overdue vs allowed ageing": {team: "Intercompany team + partner entity", action: "Aged IC item: confirm with partner, then settle, net or write off (approval needed)."}

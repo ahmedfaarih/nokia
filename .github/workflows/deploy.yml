@@ -21,7 +21,7 @@ jobs:
             cd "${{ secrets.DEPLOY_PATH }}"
             git fetch --all
             git reset --hard origin/main
-            cd recon_tool/backend
+            cd v2
             python3 -m venv venv --upgrade-deps 2>/dev/null || python3 -m venv venv
             ./venv/bin/pip install -r requirements.txt
             sudo systemctl restart reconciliation

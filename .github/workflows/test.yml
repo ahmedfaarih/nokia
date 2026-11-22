@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: recon_tool/backend
+        working-directory: v2
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +21,7 @@ jobs:
         run: pip install -r requirements.txt
 
       # Placeholder smoke check - replace with the real test command(s)
-      # once they're available (e.g. `pytest`).
-      - name: Smoke test (app imports cleanly)
-        run: python -c "import main"
+      # once they're available (e.g. `pytest`). Importing the engine package
+      # (not app.py) avoids depending on Streamlit's runtime script context.
+      - name: Smoke test (engine imports cleanly)
+        run: python -c "from engine import load, classify, detectors, risk, pipeline"

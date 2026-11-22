@@ -1,0 +1,38 @@
+name: Payroll
+# The pack is picked when one of these words appears in the file name or the Summary title
+match: [payroll]
+
+detectors:
+  offsetting_pairs: {enabled: true, keys: [assignment, reference, header_text], amount_only: true, treat_as: issue}
+  reversal_pairs:   {enabled: true, treat_as: issue}
+  overdue:          {enabled: true, use_allowed_ageing_column: true, default_allowed_days: 365}
+  stale_temporary:  {enabled: false}
+  partner:          {enabled: false}
+  duplicates:       {enabled: true}
+  sign_anomaly:     {enabled: true}
+  monthly_spike:    {enabled: true, factor: 3.0, min_eur: 5000}
+  ml_anomaly:       {enabled: true, contamination: 0.02}
+  round_amount:     {enabled: true, min_eur: 10000}
+  manual_posting:   {enabled: true}
+  backdated:        {enabled: true, days: 30}
+  weekend:          {enabled: true}
+  text_quality:     {enabled: true}
+  zero_amount:      {enabled: true}
+
+# Payroll-specific categories (checked before the shared ones)
+categories:
+  - [Pension,               "avk|pension|retire|savings plan|\\bsip\\b|\\blsl\\b|long service|ifrs pension|superann"]
+  - [Leave / holiday pay,   "leave|holiday|urlaub|vac\\.?\\s?pay|vacation"]
+  - [Salary advance,        "avance|advance|\\badv\\b"]
+  - [Social security,       "social|contribution|j[aá]rul[eé]k|\\bsgc\\b|insurance|workers comp|ssnit|medical|maternity|cbhi|\\bss\\b|\\btb\\b|\\bee\\b|\\ber\\b"]
+  - [Income tax withheld,   "tax|szja|paye|lohnsteuer"]
+  - [Payroll run,           "payroll|paie|salar|wage|net pay|regular|payment file"]
+  - [Correction / adjustment, "korr|correction|reclass|split"]
+
+# How each category is normally explained
+list_categories:   [Pension]                        # long-term, supported balance
+timing_categories: [Payroll run, Social security, Income tax withheld, Leave / holiday pay, Accrual, Salary advance, Interest]
+
+owners:
+  "Overdue vs allowed ageing": {team: "Local payroll / HR + Treasury", action: "Withholding not paid on time: pay authority/fund or clear against payment; penalty risk."}
+  "Unusual amount / spike":    {team: "Local payroll team",           action: "Validate against the payroll register for that month."}

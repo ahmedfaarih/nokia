@@ -13,10 +13,13 @@ GitHub's side except the SSH connection - no self-hosted runner needed.
    sudo mkdir -p /opt/recon_tool && sudo chown deploy:deploy /opt/recon_tool
    su - deploy
    git clone <your-repo-url> /opt/recon_tool
-   cd /opt/recon_tool/recon_tool/backend
+   cd /opt/recon_tool/v2
    python3 -m venv venv
    ./venv/bin/pip install -r requirements.txt
    ```
+   (`v2/` is ReconRadar - the Streamlit-based reconciliation engine. The
+   older `recon_tool/` FastAPI app is still in the repo but no longer
+   deployed.)
 
 2. **Install the systemd service.** Edit `deploy/reconciliation.service` if
    your path/user differ from `/opt/recon_tool` / `deploy`, then:
@@ -26,7 +29,8 @@ GitHub's side except the SSH connection - no self-hosted runner needed.
    sudo systemctl enable --now reconciliation
    sudo systemctl status reconciliation   # should be active (running)
    ```
-   It binds to `127.0.0.1:8000` - not exposed publicly, nginx proxies to it.
+   It binds to `127.0.0.1:8501` (Streamlit's default port) - not exposed
+   publicly, nginx proxies to it.
 
 3. **Let the deploy user restart the service without a password.** The GitHub
    Actions script runs `sudo systemctl restart reconciliation`, so add a
@@ -39,7 +43,10 @@ GitHub's side except the SSH connection - no self-hosted runner needed.
 
 4. **Add the nginx location block** from `deploy/nginx-snippet.conf` into your
    existing `server { }` block for the domain you want to serve this from,
-   then `sudo nginx -t && sudo systemctl reload nginx`.
+   then `sudo nginx -t && sudo systemctl reload nginx`. This matters more
+   than it looks: Streamlit talks to the browser over a WebSocket, so the
+   snippet's `Upgrade`/`Connection` headers and long `proxy_read_timeout`
+   aren't optional extras - without them the page loads but never connects.
 
 ## GitHub repo secrets
 
@@ -68,10 +75,12 @@ Push to `main` (or run the workflow manually via Actions → Deploy →
 "Run workflow"). Check the Actions log, and `sudo journalctl -u reconciliation -f`
 on the server if something doesn't come up.
 
-## Note on data files
+## AI comment drafting (optional)
 
-`recon_tool/backend/matching.py` still has a hardcoded `DATA_DIR` pointing at
-a local Mac path, used only by three unused demo-sheet fallbacks (`SOURCES` /
-`run_reconciliation`) - the live app is upload-only and never calls these, so
-this is harmless, but it does mean there's no sample data baked into the
-deployed app. Ask if you'd like that dead code removed.
+`v2` can call an LLM (Claude, Gemini, Groq, OpenRouter, Mistral, or a local
+Ollama model) to draft reconciliation comments. No server-side setup is
+required - each user pastes their own API key into the app's "AI settings"
+popover, kept only for their browser session. You can optionally pre-fill a
+key for everyone by setting an environment variable before starting the
+service (e.g. `Environment=ANTHROPIC_API_KEY=...` in the systemd unit), but
+this means that key is shared by anyone who uses the deployed instance.

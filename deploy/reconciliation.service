@@ -1,5 +1,5 @@
 [Unit]
-Description=Nokia Intercompany Reconciliation Assistant
+Description=Nokia Reconciliation Assistant (ReconRadar / v2, Streamlit)
 After=network.target
 
 [Service]
@@ -8,8 +8,8 @@ After=network.target
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now reconciliation
 User=deploy
-WorkingDirectory=/opt/recon_tool/recon_tool/backend
-ExecStart=/opt/recon_tool/recon_tool/backend/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+WorkingDirectory=/opt/recon_tool/v2
+ExecStart=/opt/recon_tool/v2/venv/bin/streamlit run app.py --server.port=8501 --server.address=127.0.0.1 --server.headless=true --browser.gatherUsageStats=false
 Restart=on-failure
 RestartSec=3
 
